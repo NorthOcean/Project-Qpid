@@ -1,8 +1,8 @@
 """
 @Author: Conghao Wong
 @Date: 2023-05-09 20:30:01
-@LastEditors: Conghao Wong
-@LastEditTime: 2023-11-01 19:49:08
+@LastEditors: Beihao Xia
+@LastEditTime: 2024-07-15 20:13:47
 @Description: file content
 @Github: https://cocoon2wong.github.io
 @Copyright 2023 Conghao Wong, All Rights Reserved.
@@ -16,10 +16,11 @@ from .__base import _BaseTransformLayer
 
 
 class FFTLayer(_BaseTransformLayer):
-    def __init__(self, Oshape: tuple[int, int], *args, **kwargs):
+    def __init__(self, Oshape: tuple[int, int], use_amp_phase=False, *args, **kwargs):
         super().__init__(Oshape, *args, **kwargs)
 
         self.mode = 0
+        self.use_amp_phase = use_amp_phase
 
     def set_Tshape(self) -> Union[list[int], tuple[int, int]]:
         return [self.steps, 2*self.channels]
@@ -44,6 +45,12 @@ class FFTLayer(_BaseTransformLayer):
 
         real = torch.concat(real, dim=-1)
         imag = torch.concat(imag, dim=-1)
+
+        if self.use_amp_phase:
+            amp = (real**2 + imag**2)**0.5
+            phase = torch.atan2(imag, real)
+            return torch.concat([amp, phase], dim=-1)
+
         return torch.concat([real, imag], dim=-1)
 
 
@@ -71,10 +78,11 @@ class FFT2DLayer(_BaseTransformLayer):
 
 
 class IFFTLayer(_BaseTransformLayer):
-    def __init__(self, Oshape: tuple[int, int], *args, **kwargs):
+    def __init__(self, Oshape: tuple[int, int], use_amp_phase=False, *args, **kwargs):
         super().__init__(Oshape, *args, **kwargs)
 
         self.mode = 0
+        self.use_amp_phase = use_amp_phase
 
     def set_Tshape(self) -> Union[list[int], tuple[int, int]]:
         return [self.steps, 2*self.channels]
@@ -87,6 +95,11 @@ class IFFTLayer(_BaseTransformLayer):
         for index in range(0, real.shape[-1]):
             r = real[..., index]
             i = imag[..., index]
+            if self.use_amp_phase:
+                _r = r * torch.cos(i)
+                _i = r * torch.sin(i)
+                r = _r
+                i = _i
             ffts.append((torch.fft.ifft(torch.complex(r, i)).real)[..., None])
 
         return torch.concat(ffts, dim=-1)
